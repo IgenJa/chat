@@ -13,4 +13,11 @@
   "dependencies": {
     "ws": "^8.18.3"
   }
+  {
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
 }
