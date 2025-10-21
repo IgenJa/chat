@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8" />
+  <title>P2P Chat</title>
+  <script src="https://unpkg.com/simple-peer@9.11.1/simplepeer.min.js"></script>
+  <style>
+    body { font-family: sans-serif; max-width: 600px; margin: 30px auto; }
+    #chat { border: 1px solid #ccc; padding: 10px; height: 300px; overflow-y: auto; margin-bottom: 10px; }
+    input, button { padding: 6px; font-size: 1em; }
+  </style>
+</head>
+<body>
+  <h2>🌐 P2P Chat</h2>
+  <p>Azonosítód: <span id="myid">...</span></p>
+  <input id="peerid" placeholder="Másik peer ID" />
+  <button id="connectBtn">Csatlakozás</button>
+
+  <div id="chat"></div>
+  <input id="msg" placeholder="Írj üzenetet..." />
+  <button id="sendBtn">Küldés</button>
+
+  <script>
+    const ws = new WebSocket("ws://localhost:3000");
+    let myId = null;
+    let peer = null;
+
+    const chat = document.getElementById('chat');
+    const msg = document.getElementById('msg');
+
+    function log(text) {
+      chat.innerHTML += `<div>${text}</div>`;
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    ws.onmessage = (e) => {
+      const data = JSON.parse(e.data);
+      if (data.type === 'welcome') {
+        myId = data.id;
+        document.getElementById('myid').textContent = myId;
+      }
+
+      if (data.type === 'offer') {
+        log("Kapott offer...");
+        peer = new SimplePeer({ initiator: false, trickle: false });
+        peer.signal(data.sig);
+        peer.on('signal', sig => ws.send(JSON.stringify({ type: 'answer', to: data.from, sig })));
+        setupPeer();
+      }
+
+      if (data.type === 'answer') {
+        peer.signal(data.sig);
+      }
+    };
+
+    document.getElementById('connectBtn').onclick = () => {
+      const id = document.getElementById('peerid').value.trim();
+      if (!id) return alert("Add meg a másik peer ID-t!");
+      peer = new SimplePeer({ initiator: true, trickle: false });
+      peer.on('signal', sig => ws.send(JSON.stringify({ type: 'offer', to: id, sig })));
+      setupPeer();
+    };
+
+    function setupPeer() {
+      peer.on('connect', () => log("✅ P2P kapcsolat létrejött!"));
+      peer.on('data', d => log("👤 " + d.toString()));
+    }
+
+    document.getElementById('sendBtn').onclick = () => {
+      if (!peer || !peer.connected) return alert("Nincs kapcsolat!");
+      peer.send(msg.value);
+      log("Te: " + msg.value);
+      msg.value = '';
+    };
+  </script>
+</body>
+</html>
